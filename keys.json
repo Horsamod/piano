@@ -1,4 +1,8 @@
 {
-    "keys": ["MATCH458569320P1", "ANOTHERKEY12345"]
-  }
+  "keys": [
+    "4ee61a6e819f7f488a0e5840e3e3f43335488da256da6d4a6118ceff6f92f47a", 
+    "..." // Add more hashed keys as needed
+  ]
+}
+
   
