@@ -56,7 +56,7 @@ body {
   position: relative;
   overflow: hidden;
   border-radius: 0px;
-  transform: scale(.95);
+  transform: scale(0.9);
 }
 
 .piano-container::before {
