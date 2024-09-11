@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>File Manager with Editor</title>
+    
+    <!-- Materialize CSS -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css" rel="stylesheet">
+    
+    <!-- Materialize Icons -->
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    
+    <!-- Ace Editor -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.4.12/ace.js"></script>
+    
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+        #editor {
+            width: 100%;
+            height: 400px;
+            margin-top: 20px;
+            border: 1px solid #ccc;
+        }
+        .sidenav {
+            width: 300px;
+        }
+        .file-item {
+            padding: 10px;
+            border-bottom: 1px solid #ccc;
+        }
+        .file-item:last-child {
+            border-bottom: none;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="nav-extended">
+        <div class="nav-wrapper">
+            <a href="#" class="brand-logo center">File Manager</a>
+            <a href="#" data-target="slide-out" class="sidenav-trigger show-on-large">
+                <i class="material-icons">menu</i>
+            </a>
+        </div>
+    </nav>
+
+    <!-- Sidenav for File List -->
+    <ul id="slide-out" class="sidenav">
+        <li>
+            <div class="user-view">
+                <div class="background">
+                    <img src="https://materializecss.com/images/office.jpg">
+                </div>
+                <a href="#!"><span class="white-text name">File List</span></a>
+            </div>
+        </li>
+        <li>
+            <div id="file-list" class="collection">
+                <!-- Files will be listed here -->
+            </div>
+        </li>
+    </ul>
+
+    <!-- Main Content -->
+    <div class="container">
+        <div class="row">
+            <div class="input-field col s6">
+                <input id="file-name" type="text" class="validate">
+                <label for="file-name">File Name (without extension)</label>
+            </div>
+            <div class="input-field col s6">
+                <select id="file-extension">
+                    <option value="html">.html</option>
+                    <option value="css">.css</option>
+                    <option value="js">.js</option>
+                    <option value="json">.json</option>
+                </select>
+                <label>File Type</label>
+            </div>
+        </div>
+
+        <div id="editor"></div>
+
+        <button id="save-btn" class="btn waves-effect waves-light">Save to GitHub</button>
+        <div id="status" class="section"></div>
+    </div>
+
+    <!-- Materialize JS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize the side nav
+            const elems = document.querySelectorAll('.sidenav');
+            M.Sidenav.init(elems);
+            
+            // Initialize the select element
+            const selectElems = document.querySelectorAll('select');
+            M.FormSelect.init(selectElems);
+        });
+
+        // GitHub API Token and repo details
+        const GITHUB_TOKEN = 'token'; // Replace with your token
+        const GITHUB_REPO_OWNER = 'Horsamod'; // Replace with your GitHub username
+        const GITHUB_REPO_NAME = 'piano'; // Replace with your repository name
+        const GITHUB_BRANCH = 'main'; // Replace with your branch (e.g., main)
+        
+        // Initialize the Ace editor
+        const editor = ace.edit("editor");
+        editor.setTheme("ace/theme/monokai");
+        editor.session.setMode("ace/mode/html"); // Default mode is HTML
+
+        // Update Ace editor mode based on file type
+        document.getElementById('file-extension').addEventListener('change', function() {
+            const ext = this.value;
+            switch (ext) {
+                case 'html':
+                    editor.session.setMode("ace/mode/html");
+                    break;
+                case 'css':
+                    editor.session.setMode("ace/mode/css");
+                    break;
+                case 'js':
+                    editor.session.setMode("ace/mode/javascript");
+                    break;
+                case 'json':
+                    editor.session.setMode("ace/mode/json");
+                    break;
+            }
+        });
+
+        // Handle Save Button click
+        document.getElementById('save-btn').addEventListener('click', function () {
+            const fileName = document.getElementById('file-name').value;
+            const fileExtension = document.getElementById('file-extension').value;
+            const content = editor.getValue();
+
+            if (!fileName || !content) {
+                alert("Please fill in both fields");
+                return;
+            }
+
+            if (fileExtension === 'json') {
+                try {
+                    JSON.parse(content); // Validate JSON
+                } catch (e) {
+                    alert("Invalid JSON content");
+                    return;
+                }
+            }
+
+            // Base64 encode the content
+            const base64Content = btoa(unescape(encodeURIComponent(content)));
+
+            // Save the file to GitHub
+            saveToGitHub(`${fileName}.${fileExtension}`, base64Content);
+        });
+
+        // Function to save the file to GitHub
+        async function saveToGitHub(fileName, content) {
+            const url = `https://api.github.com/repos/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/contents/${fileName}`;
+
+            // Get file SHA if it exists (needed for updates)
+            let sha = null;
+            try {
+                const fileResponse = await fetch(url, {
+                    headers: {
+                        'Authorization': `token ${GITHUB_TOKEN}`
+                    }
+                });
+                if (fileResponse.ok) {
+                    const fileData = await fileResponse.json();
+                    sha = fileData.sha;
+                }
+            } catch (error) {
+                console.log('File not found, creating a new one.');
+            }
+
+            // Prepare payload
+            const payload = {
+                message: `Saving file ${fileName}`,
+                content: content,
+                branch: GITHUB_BRANCH
+            };
+            if (sha) payload.sha = sha;
+
+            // Send PUT request to GitHub API
+            const response = await fetch(url, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `token ${GITHUB_TOKEN}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            });
+
+            const statusDiv = document.getElementById('status');
+            if (response.ok) {
+                statusDiv.innerHTML = `<span class="green-text">File ${fileName} saved successfully!</span>`;
+                fetchFileList(); // Refresh the file list
+            } else {
+                const errorData = await response.json();
+                statusDiv.innerHTML = `<span class="red-text">Error: ${errorData.message}</span>`;
+            }
+        }
+
+        // Fetch and display the list of files in the repository
+        async function fetchFileList() {
+            const url = `https://api.github.com/repos/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/contents/`;
+            const response = await fetch(url, {
+                headers: {
+                    'Authorization': `token ${GITHUB_TOKEN}`
+                }
+            });
+
+            const fileListDiv = document.getElementById('file-list');
+            fileListDiv.innerHTML = ''; // Clear existing list
+
+            if (response.ok) {
+                const files = await response.json();
+                files.forEach(file => {
+                    const fileItem = document.createElement('a');
+                    fileItem.href = '#!';
+                    fileItem.classList.add('collection-item');
+                    fileItem.innerText = file.name;
+                    fileListDiv.appendChild(fileItem);
+                });
+            } else {
+                fileListDiv.innerHTML = '<span class="red-text">Error fetching file list</span>';
+            }
+        }
+
+        // Fetch the file list on page load
+        window.onload = function () {
+            fetchFileList();
+        };
+    </script>
+</body>
+</html>
