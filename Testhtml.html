@@ -1,0 +1,225 @@
+
+        
+        
+        <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Save Files to GitHub</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+        #data-list {
+            margin-top: 20px;
+        }
+        .data-item {
+            margin-bottom: 10px;
+        }
+        .button {
+            margin-left: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Save Files to GitHub</h1>
+    
+    <div>
+        <label for="name">File Name:</label>
+        <input type="text" id="name" placeholder="Enter file name without extension">
+        <select id="file-extension">
+            <option value="html">.html</option>
+            <option value="css">.css</option>
+            <option value="js">.js</option>
+            <option value="json">.json</option>
+        </select>
+    </div>
+    
+    <div>
+        <label for="content">Content:</label>
+        <textarea id="content" rows="10" cols="50" placeholder="Enter content"></textarea>
+    </div>
+    
+    <button id="save-btn">Save to GitHub</button>
+    
+    <h2>Saved Files</h2>
+    <div id="file-list"></div>
+    
+    <h2>Status</h2>
+    <div id="status"></div>
+
+    <script>
+        // GitHub API Token and repo details
+        // GitHub API Token and repo details
+        const GITHUB_TOKEN = 'token'; // Replace with your token
+        const GITHUB_REPO_OWNER = 'Horsamod'; // Replace with your GitHub username
+        const GITHUB_REPO_NAME = 'piano'; // Replace with your repository name
+        const GITHUB_BRANCH = 'main'; // Replace with your branch (e.g., main)
+        
+        // On page load, fetch and display the file list
+        window.onload = function () {
+            fetchFileList();
+        };
+
+        // Handle the Save Button click
+        document.getElementById('save-btn').addEventListener('click', function () {
+            const fileName = document.getElementById('name').value;
+            const fileExtension = document.getElementById('file-extension').value;
+            const content = document.getElementById('content').value;
+
+            if (!fileName || !content) {
+                alert("Please fill both fields");
+                return;
+            }
+
+            // Validate JSON file
+            if (fileExtension === 'json') {
+                try {
+                    JSON.parse(content); // Check if it's valid JSON
+                } catch (e) {
+                    alert("Invalid JSON content");
+                    return;
+                }
+            }
+
+            // Convert content to base64 (required by GitHub API)
+            const base64Content = btoa(unescape(encodeURIComponent(content)));
+
+            // Call the GitHub API to save the file
+            saveToGitHub(`${fileName}.${fileExtension}`, base64Content);
+        });
+
+        // Function to save the file to GitHub
+        async function saveToGitHub(fileName, content) {
+            const url = `https://api.github.com/repos/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/contents/${fileName}`;
+            
+            // Get the file SHA if it already exists (needed for updates)
+            let sha = null;
+            try {
+                const fileResponse = await fetch(url, {
+                    headers: {
+                        'Authorization': `token ${GITHUB_TOKEN}`
+                    }
+                });
+                if (fileResponse.ok) {
+                    const fileData = await fileResponse.json();
+                    sha = fileData.sha;
+                }
+            } catch (error) {
+                console.log('File not found, creating a new file.');
+            }
+
+            // Payload to send to the API
+            const payload = {
+                message: `Saving file ${fileName}`,
+                content: content,
+                branch: GITHUB_BRANCH
+            };
+
+            // Add the file's SHA if it already exists (for updates)
+            if (sha) {
+                payload.sha = sha;
+            }
+
+            // Send the request to GitHub
+            const response = await fetch(url, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `token ${GITHUB_TOKEN}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            });
+
+            const statusDiv = document.getElementById('status');
+            if (response.ok) {
+                statusDiv.innerHTML = `<span style="color: green;">File ${fileName} saved successfully!</span>`;
+                fetchFileList(); // Refresh the file list after saving
+            } else {
+                const errorData = await response.json();
+                statusDiv.innerHTML = `<span style="color: red;">Error: ${errorData.message}</span>`;
+            }
+        }
+
+        // Fetch and display the list of files in the repository
+        async function fetchFileList() {
+            const url = `https://api.github.com/repos/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/contents/`;
+            const response = await fetch(url, {
+                headers: {
+                    'Authorization': `token ${GITHUB_TOKEN}`
+                }
+            });
+            const fileListDiv = document.getElementById('file-list');
+            fileListDiv.innerHTML = '';
+
+            if (response.ok) {
+                const files = await response.json();
+
+                files.forEach(file => {
+                    const fileItem = document.createElement('div');
+                    fileItem.classList.add('data-item');
+                    fileItem.innerHTML = `
+                        <strong>${file.name}</strong> 
+                        <button class="button" onclick="downloadFile('${file.name}')">Download</button>
+                        <button class="button" onclick="deleteFile('${file.path}', '${file.sha}')">Delete</button>
+                    `;
+                    fileListDiv.appendChild(fileItem);
+                });
+            } else {
+                fileListDiv.innerHTML = '<span style="color: red;">Error fetching file list</span>';
+            }
+        }
+
+        // Download a file from GitHub
+        async function downloadFile(fileName) {
+            const url = `https://api.github.com/repos/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/contents/${fileName}`;
+            const response = await fetch(url, {
+                headers: {
+                    'Authorization': `token ${GITHUB_TOKEN}`
+                }
+            });
+
+            if (response.ok) {
+                const fileData = await response.json();
+                const fileContent = atob(fileData.content); // Decode Base64 content
+
+                const blob = new Blob([fileContent], { type: 'text/plain' });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = fileName;
+                link.click();
+            }
+        }
+
+        // Delete a file from GitHub
+        async function deleteFile(filePath, sha) {
+            const url = `https://api.github.com/repos/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/contents/${filePath}`;
+            
+            const payload = {
+                message: `Deleting file ${filePath}`,
+                sha: sha,
+                branch: GITHUB_BRANCH
+            };
+
+            const response = await fetch(url, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `token ${GITHUB_TOKEN}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            });
+
+            if (response.ok) {
+                document.getElementById('status').innerHTML = `<span style="color: green;">File ${filePath} deleted successfully!</span>`;
+                fetchFileList(); // Refresh the file list after deletion
+            } else {
+                const errorData = await response.json();
+                document.getElementById('status').innerHTML = `<span style="color: red;">Error: ${errorData.message}</span>`;
+            }
+        }
+    </script>
+</body>
+</html>
