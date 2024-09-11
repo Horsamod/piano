@@ -1,7 +1,1 @@
 
-{
-  "name": "John Doe",
-  "age": 30,
-  "_comment": "This is a comment about the user object",
-  "email": "john.doe@example.com"
-}
