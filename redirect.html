@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Redirecting...</title>
+    <script>
+        async function init() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const qrId = urlParams.get('id');
+            
+            // Track the scan
+            await fetch(`/track-scan?id=${qrId}`);
+            
+            // Redirect to target URL
+            const response = await fetch(`/get-url?id=${qrId}`);
+            const data = await response.json();
+            window.location.href = data.url;
+        }
+        init();
+    </script>
+</head>
+<body>
+    <p>Redirecting...</p>
+</body>
+</html>
